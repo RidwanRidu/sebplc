@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Accounts Search</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <style>
+    /* Basic styling for the body */
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      line-height: 1.6;
+      background-color: #f0f4f8;
+    }
+
+    /* Skip link for accessibility */
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      background: #1a202c;
+      color: white;
+      padding: 8px 12px;
+      z-index: 100;
+      transition: top 0.3s ease;
+      border-radius: 0 0 4px 4px;
+    }
+
+    .skip-link:focus {
+      top: 0;
+    }
+
+    /* Header styling */
+    .header {
+      background: #2c5282;
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .header h2 {
+        margin: 0;
+        font-size: 1.75rem;
+    }
+
+    /* Search container styling */
+    .search-container {
+      display: flex;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    /* Search input box styling */
+    #searchBox {
+      flex: 1;
+      padding: 12px 15px;
+      font-size: 16px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      padding-right: 40px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    #searchBox:focus {
+        outline: none;
+        border-color: #4299e1;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+    }
+
+    /* Status and loading message styling */
+    #statusMessage, #loadingMessage {
+      font-weight: 600;
+      margin-bottom: 15px;
+      padding: 12px 15px;
+      border-radius: 6px;
+      display: none;
+      text-align: center;
+    }
+
+    /* Grid layout for result cards */
+    .card-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    /* Individual card styling */
+    .card {
+      position: relative;
+      border: 1px solid #e2e8f0;
+      padding: 18px;
+      border-radius: 8px;
+      background: #ffffff;
+      transition: all 0.3s ease;
+      border-left: 5px solid #2c5282;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Specific border colors for account types */
+    .card.savings {
+      border-left-color: #38a169;
+    }
+
+    .card.current {
+      border-left-color: #3182ce;
+    }
+
+    /* Hover effect for cards */
+    .card:hover {
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      transform: translateY(-4px);
+    }
+
+    /* Card title styling */
+    .card h3 {
+      margin: 0 0 12px 0;
+      font-size: 1.1rem;
+      color: #2d3748;
+      border-bottom: 1px solid #edf2f7;
+      padding-bottom: 8px;
+      padding-right: 60px;
+      font-weight: 600;
+    }
+
+    /* Card paragraph styling */
+    .card p {
+      margin: 8px 0;
+      font-size: 0.9rem;
+      color: #4a5568;
+    }
+
+    .card p strong {
+      color: #2d3748;
+      min-width: 100px;
+      display: inline-block;
+      font-weight: 600;
+    }
+
+    /* Status badge styling */
+    .status-badge {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Status color classes */
+    .status-na {
+      background: #c6f6d5;
+      color: #2f855a;
+    }
+
+    .status-not-delivered {
+      background: #fed7d7;
+      color: #c53030;
+    }
+
+    .status-not-delivered-card {
+      background: #fed7d7;
+      color: #c53030;
+    }
+
+    .status-active {
+      background: #c6f6d5;
+      color: #2f855a;
+    }
+
+    .status-inactive {
+      background: #fed7d7;
+      color: #c53030;
+    }
+
+    /* Message type styling */
+    .error {
+      background: #fed7d7;
+      color: #c53030;
+      border: 1px solid #fbb6b6;
+    }
+
+    .success {
+      background: #c6f6d5;
+      color: #2f855a;
+      border: 1px solid #9ae6b4;
+    }
+
+    .info {
+      background: #bee3f8;
+      color: #2b6cb0;
+      border: 1px solid #90cdf4;
+    }
+
+    .warning {
+      background: #feebc8;
+      color: #b7791f;
+      border: 1px solid #fbd38d;
+    }
+
+    /* Loading spinner animation */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Loading spinner element */
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(43, 108, 176, 0.3);
+      border-radius: 50%;
+      border-top-color: #2b6cb0;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    /* Container for loading spinner and text */
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Floating Action Button (FAB) for clearing search */
+    .fab {
+      position: fixed;
+      bottom: 25px;
+      right: 25px;
+      width: 55px;
+      height: 55px;
+      background-color: #e53e3e;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 28px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+
+    .fab:hover {
+      background-color: #c53030;
+      transform: scale(1.05);
+    }
+    .fab:active {
+        transform: scale(0.95);
+    }
+
+    /* Styling for no results message */
+    .no-results {
+        text-align: center;
+        color: #718096;
+        margin-top: 30px;
+        font-size: 1.1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>Kodomtola Bazar Agent Outlet Accounts Records</h2>
+  </div>
+
+  <main id="main-content">
+    <div class="search-container">
+      <input id="searchBox" aria-label="Search accounts by Name, Account No, Phone or Cheque Status" placeholder="Enter Name, Account No, Phone or Cheque Status" type="text" />
+      </div>
+
+    <div id="loadingMessage" class="info" role="alert" aria-live="assertive">
+      <div class="loading-container">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <span>Loading data...</span>
+      </div>
+    </div>
+    <div id="statusMessage" role="status" aria-live="polite"></div>
+
+    <div class="card-container" id="resultContainer">
+        </div>
+  </main>
+
+  <button class="fab" id="clearSearch" title="Clear Search" aria-label="Clear search">✕</button>
+
+  <script>
+    // DOM elements
+    const searchBox = document.getElementById('searchBox');
+    const clearSearch = document.getElementById('clearSearch');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const statusMessage = document.getElementById('statusMessage');
+    const resultContainer = document.getElementById('resultContainer');
+
+    // Global variables
+    let sheetData = [];
+    let lowerCaseData = [];
+    let debounceTimeout;
+
+    // CSV data sources
+    const csvSources = [
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVjB82Dp1PvQm5mHOuhljTSVySLfHMDq_FTfnMSC7E8Brq-4L3KUCR2ljRsUOfvw/pub?output=csv"
+    ];
+
+    const DEBOUNCE_TIME = 300;
+
+    // Initialize application
+    window.onload = function() {
+      setupEventListeners();
+      loadDataFromMultipleSources();
+    };
+
+    // Event listeners setup
+    function setupEventListeners() {
+      searchBox.addEventListener('input', debounceSearch);
+      clearSearch.addEventListener('click', clearSearchHandler);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          clearSearchHandler();
+          searchBox.focus();
+        }
+      });
+
+      searchBox.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          clearTimeout(debounceTimeout);
+          searchData();
+        }
+      });
+    }
+
+    // Clear search handler
+    function clearSearchHandler() {
+      searchBox.value = '';
+      searchData();
+    }
+
+    // Data loading functions
+    function loadDataFromMultipleSources(sourceIndex = 0) {
+      if (sourceIndex >= csvSources.length) {
+        const cachedData = localStorage.getItem('accountsData');
+        const cacheTime = localStorage.getItem('accountsDataTime');
+        if (cachedData && cacheTime) {
+          const lastUpdated = new Date(parseInt(cacheTime)).toLocaleString();
+          showMessage(`Failed to fetch live data. Using cached data (last updated: ${lastUpdated})`, "warning");
+          processData(JSON.parse(cachedData));
+        } else {
+          showMessage("Error: Could not load account data. Please check your internet connection or the data source.", "error");
+          hideLoading();
+        }
+        return;
+      }
+
+      showLoading(`Loading data from source ${sourceIndex + 1}...`, "info");
+
+      fetch(csvSources[sourceIndex])
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status} for ${csvSources[sourceIndex]}`);
+          }
+          return response.text();
+        })
+        .then(csvText => {
+          const parsedData = Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            transform: value => value ? value.trim() : ''
+          }).data;
+
+          try {
+            localStorage.setItem('accountsData', JSON.stringify(parsedData));
+            localStorage.setItem('accountsDataTime', Date.now().toString());
+          } catch (e) {
+            console.error("Failed to cache data in localStorage:", e);
+            showMessage("Warning: Could not cache data locally.", "warning");
+          }
+
+          processData(parsedData);
+          showMessage(`Data loaded successfully from source ${sourceIndex + 1} with ${sheetData.length} records`, "success");
+        })
+        .catch(error => {
+          console.error(`Failed to load data from source ${sourceIndex + 1}:`, error);
+          loadDataFromMultipleSources(sourceIndex + 1);
+        });
+    }
+
+    // Process loaded data
+    function processData(parsedData) {
+      sheetData = parsedData.filter(row =>
+        row &&
+        row["Name"] && row["Account Number"] &&
+        Object.values(row).some(val => val && val.toString().trim() !== "")
+      );
+
+      lowerCaseData = sheetData.map(row => {
+        const searchStringContent = Object.values(row)
+                                         .map(val => (val ? val.toString() : ''))
+                                         .join(" ");
+        return {
+          row,
+          searchString: searchStringContent.toLowerCase()
+        };
+      });
+
+      hideLoading();
+      displayResults(sheetData);
+
+      if (sheetData.length === 0 && parsedData.length > 0) {
+           showMessage("Warning: Data loaded, but no valid records found after filtering.", "warning");
+      } else if (sheetData.length === 0) {
+      } else {
+           if (!statusMessage.textContent.includes("successfully")) {
+                showMessage(`Displaying ${sheetData.length} records`, "info");
+           }
+      }
+    }
+
+    // Search functionality
+    function debounceSearch() {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(searchData, DEBOUNCE_TIME);
+    }
+
+    function searchData() {
+      const query = searchBox.value.trim().toLowerCase();
+
+      if (!query) {
+        displayResults(sheetData);
+        showMessage(`Showing all ${sheetData.length} records.`, 'info');
+        return;
+      }
+
+      showLoading("Searching...", "info");
+
+      setTimeout(() => {
+        const results = lowerCaseData
+          .filter(item => item.searchString.includes(query))
+          .map(item => item.row);
+
+        displayResults(results);
+        hideLoading();
+
+        if (results.length === 0) {
+          showMessage('No matching records found.', 'warning');
+        } else {
+          showMessage(`Found ${results.length} matching record(s).`, 'success');
+        }
+      }, 50);
+    }
+
+    // Display results
+    function displayResults(data) {
+      resultContainer.innerHTML = '';
+
+      if (!data || data.length === 0) {
+          if (searchBox.value.trim() !== '') {
+              resultContainer.innerHTML = '<p class="no-results">No records match your search criteria.</p>';
+          } else if (sheetData.length > 0) {
+               resultContainer.innerHTML = '<p class="no-results">No records to display.</p>';
+          } else {
+               resultContainer.innerHTML = '<p class="no-results">Could not load data or no records available.</p>';
+          }
+        return;
+      }
+
+      data.forEach(row => {
+        const card = document.createElement('div');
+        const accountType = (row["Account Type"] || '').toLowerCase();
+        card.className = `card ${escapeHTML(accountType)}`;
+
+        // Determine status class based on Cheque Status
+        const chequeStatus = (row["Cheque Status"] || '').toLowerCase();
+        let statusClass = 'status-inactive';
+
+        if (chequeStatus.includes('n/a') || chequeStatus === '') {
+          statusClass = 'status-na';
+        } else if (chequeStatus.includes('not delivered') && chequeStatus.includes('card')) {
+          statusClass = 'status-not-delivered-card';
+        } else if (chequeStatus.includes('not delivered')) {
+          statusClass = 'status-not-delivered';
+        } else if (chequeStatus.includes('active')) {
+          statusClass = 'status-active';
+        }
+
+        card.innerHTML = `
+          <h3>${escapeHTML(row["Name"] || 'N/A')}</h3>
+          <span class="status-badge ${statusClass}">${escapeHTML(row["Cheque Status"] || 'N/A')}</span>
+          <p><strong>Account No:</strong> ${escapeHTML(row["Account Number"] || 'N/A')}</p>
+          <p><strong>Phone:</strong> ${escapeHTML(row["Phone Number"] || 'N/A')}</p>
+          <p><strong>Type:</strong> ${escapeHTML(row["Account Type"] || 'N/A')}</p>
+          <p><strong>Balance:</strong> ${formatCurrency(row["Opening Balance"] || 'N/A')}</p>
+          <p><strong>Open Date:</strong> ${formatDate(row["Open Date"] || 'N/A')}</p>
+          `;
+        resultContainer.appendChild(card);
+      });
+    }
+
+    // Utility functions
+    function formatCurrency(amount) {
+        if (amount === 'N/A' || amount === null || amount === undefined || amount === '') return 'N/A';
+        const numericAmount = parseFloat(amount.toString().replace(/[^0-9.-]/g, ''));
+        if (isNaN(numericAmount)) {
+            return escapeHTML(amount);
+        }
+        try {
+             return new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT' }).format(numericAmount);
+        } catch (e) {
+            console.warn("Intl.NumberFormat for BDT might not be supported, using basic formatting.");
+            return '৳' + numericAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+    }
+
+    function formatDate(dateString) {
+      if (dateString === 'N/A' || !dateString) return 'N/A';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return escapeHTML(dateString);
+      }
+      try {
+        return date.toLocaleDateString(navigator.language || 'en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+      } catch (e) {
+          console.warn("toLocaleDateString failed, using basic formatting.");
+          let day = ('0' + date.getDate()).slice(-2);
+          let month = ('0' + (date.getMonth() + 1)).slice(-2);
+          let year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+      }
+    }
+
+    function showMessage(msg, type) {
+      statusMessage.textContent = msg;
+      statusMessage.className = type;
+      statusMessage.style.display = 'block';
+      statusMessage.setAttribute('role', type === 'error' ? 'alert' : 'status');
+
+      if (type === 'success') {
+        setTimeout(() => {
+            if (statusMessage.textContent === msg) {
+                 statusMessage.style.display = 'none';
+            }
+        }, 3000);
+      }
+    }
+
+    function showLoading(msg, type) {
+      loadingMessage.querySelector('span').textContent = msg;
+      loadingMessage.className = type;
+      loadingMessage.style.display = 'flex';
+    }
+
+    function hideLoading() {
+      loadingMessage.style.display = 'none';
+    }
+
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return str.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>
